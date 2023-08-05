@@ -89,8 +89,10 @@ pub fn (mut gen LexicalUUIDGenerator) v1() !string {
 		}
 		gen.counter++
 	} else {
+		gen.current_ts = nano_ts
 		gen.counter = 0
 	}
+
 	mut seq := s.format_int(gen.counter, 2)
 
 	// Padding ensures that the binary representation of the counter always utilizes 8 bits.
