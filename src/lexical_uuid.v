@@ -24,8 +24,9 @@ pub fn (mut gen LexicalUUIDGenerator) v1() !string {
 	*
 	* Seconds since 1st January 1970
 	*/
-	wall_ts := t.utc().unix_time()
-	mut unixts := s.format_uint(u64(wall_ts), 2)
+	ts := t.utc()
+	mut unixts := s.format_uint(u64(ts.unix), 2)
+
 	// Pad with 0s to the right if output is shorter than 36
 	for unixts.len < 36 {
 		unixts = '0${unixts}'
@@ -37,8 +38,7 @@ pub fn (mut gen LexicalUUIDGenerator) v1() !string {
 	*
 	* The nanosecond field is supposed to be a fraction as opposed to the specific number of nanoseconds.
 	*/
-	// TODO change to wall clock nanoseconds once V implements it
-	wall_nsec := t.sys_mono_now() % 1_000_000_000
+	wall_nsec := ts.nanosecond % 1_000_000_000
 
 	sec := f64(wall_nsec) / 1_000_000_000
 	// scale_factor ensures that the binary representation utilizes a maximum of 38 bits.
@@ -82,7 +82,8 @@ pub fn (mut gen LexicalUUIDGenerator) v1() !string {
 	* The maximum number of generations per nanosecond is of 255 (111111 or FF). Exceeding 255 generations
 	* per nanosecond is very unlikely.
 	*/
-	nano_ts := '${wall_ts}${wall_nsec}'
+	nano_ts := '${ts.nanosecond}${wall_nsec}'
+	println(ts.nanosecond)
 	if nano_ts == gen.current_ts {
 		if gen.counter >= 255 {
 			return error('Too many generations per nanosecond.')
