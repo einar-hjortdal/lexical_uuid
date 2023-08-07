@@ -1,4 +1,4 @@
-module lexical_uuid
+module luuid
 
 import math as m
 import rand as r

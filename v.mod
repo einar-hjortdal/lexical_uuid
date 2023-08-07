@@ -1,5 +1,5 @@
 Module{
-	name: 'lexical_uuid'
+	name: 'luuid'
 	description: 'lexicographically-sortable universally unique id.'
 	repo_url: 'https://github.com/Coachonko/lexical_uuid'
 	version: '1.1.0'
