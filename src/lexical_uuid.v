@@ -117,6 +117,10 @@ pub fn (mut gen LexicalUUIDGenerator) v1() !string {
 
 	bin_res := '${unixts}${nsec_1}${ver}${nsec_2}${var}${nsec_3}${seq}${rand}'
 
+	return build_result(bin_res)!
+}
+
+fn build_result(binary_string string) !string {
 	mut hex_res := ''
 	dash_index := [32, 48, 64, 80]
 	for i := 0; i < 128; i += 4 {
@@ -125,12 +129,14 @@ pub fn (mut gen LexicalUUIDGenerator) v1() !string {
 			hex_res += '-'
 		}
 		// parse character
-		character := bin_res[i..i + 4]
-		to_int := s.parse_uint(character, 2, 4) or { return error('Could not parse integer') }
+		character := binary_string[i..i + 4]
+		to_int := s.parse_uint(character, 2, 4) or {
+			return error('Could not parse integer')
+			// TODO do not return error
+		}
 		to_hex := to_int.hex()
 		hex_res += to_hex
 	}
-
 	return hex_res
 }
 
@@ -214,21 +220,7 @@ pub fn (mut gen LexicalUUIDGenerator) v2() !string {
 	*/
 	bin_res := '${adjts}${microsec}${seq}${rand}'
 
-	mut hex_res := ''
-	dash_index := [32, 48, 64, 80]
-	for i := 0; i < 128; i += 4 {
-		// add dash
-		if i in dash_index {
-			hex_res += '-'
-		}
-		// parse character
-		character := bin_res[i..i + 4]
-		to_int := s.parse_uint(character, 2, 4) or { return error('Could not parse integer') }
-		to_hex := to_int.hex()
-		hex_res += to_hex
-	}
-
-	return hex_res
+	return build_result(bin_res)!
 }
 
 pub fn parse_v2() {
