@@ -34,23 +34,27 @@ The suggested implementation was as follows:
 
 # v2
 
-This version includes several changes that I believe improve the specification utilized in v1:
+This version significantly deviates from UUID standards:
 - Dedicate 32 bits to the timestamp in seconds and adjust the start to a more recent date, January 1st 
-  2020. Lexical UUIDs are not generated in the past.
-- Dedicate 30 bits in total to sub-second encoding for the Nanosecond precision. This is achieved by 
-  representing the nsec field as the number of nanoseconds instead of as a fraction of a second.
-- The random component now has some extra bits compared to v1: 50 in total.
+  2020. (Inspired by [KSUID](https://github.com/segmentio/ksuid))
+- Dedicate 20 bits in total to the microsecond precision, represented by the specific number of microseconds.
+- No version bits
+- No variant bits
+- Dedicate 68 bits to the random component.
 
 ```
  0                   1                   2                   3
  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|                            adjts                              |
+|                             adjts                             |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|               nsc             |  ver  |         nsc           |
+|                 µsec                  |      seq      | rand  |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|var|nsc|      seq      |                 rand                  |
+|                             rand                              |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |                             rand                              |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ```
+
+I prefer to use this version of Lexical UUID in my programs. I do not need strict UUID compatibility
+and I do not generate more than 255 of these per microsecond.

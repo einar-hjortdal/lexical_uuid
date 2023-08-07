@@ -27,7 +27,7 @@ pub fn (mut gen LexicalUUIDGenerator) v1() !string {
 	ts := t.utc()
 	mut unixts := s.format_uint(u64(ts.unix), 2)
 
-	// Pad with 0s to the right if output is shorter than 36
+	// Pad with 0s to the left if output is shorter than 36
 	for unixts.len < 36 {
 		unixts = '0${unixts}'
 	}
@@ -38,9 +38,7 @@ pub fn (mut gen LexicalUUIDGenerator) v1() !string {
 	*
 	* The nanosecond field is supposed to be a fraction as opposed to the specific number of nanoseconds.
 	*/
-	wall_nsec := ts.nanosecond % 1_000_000_000
-
-	sec := f64(wall_nsec) / 1_000_000_000
+	sec := f64(ts.nanosecond) / 1_000_000_000
 	// scale_factor ensures that the binary representation utilizes a maximum of 38 bits.
 	scale_factor := m.exp2(38)
 	float_nsec := sec / (1.0 / scale_factor)
@@ -82,10 +80,9 @@ pub fn (mut gen LexicalUUIDGenerator) v1() !string {
 	* The maximum number of generations per nanosecond is of 255 (111111 or FF). Exceeding 255 generations
 	* per nanosecond is very unlikely.
 	*/
-	nano_ts := '${ts.nanosecond}${wall_nsec}'
-	println(ts.nanosecond)
+	nano_ts := '${unixts}${ts.nanosecond}'
 	if nano_ts == gen.current_ts {
-		if gen.counter >= 255 {
+		if gen.counter == 255 {
 			return error('Too many generations per nanosecond.')
 		}
 		gen.counter++
@@ -151,44 +148,87 @@ pub fn (mut gen LexicalUUIDGenerator) v2() !string {
 	* 32 bits
 	*
 	* Seconds since 1st January 2020.
-	* It should be an unsigned 32 bit integer.
 	*/
+	modern_epoch := 1577836800
+
+	ts := t.utc()
+	int_adjts := ts.unix - modern_epoch
+	mut adjts := s.format_uint(u64(int_adjts), 2)
+
+	// Pad with 0s to the left if output is shorter than 32
+	for adjts.len < 32 {
+		adjts = '0${adjts}'
+	}
 
 	/*
-	* nsec
-	* 30 bits
+	* µsec
+	* 20 bits
 	*
-	* The nanosecond field is the specific number of nanoseconds.
+	* The specific number of microseconds.
 	*/
+	int_microsec := ts.nanosecond / 1000
+	mut microsec := s.format_uint(u64(int_microsec), 2)
 
-	/*
-	* ver
-	* This is the implementation of a rejected UUID version 7.
-	* 0     0     1     0
-	*/
-	// ver :=
-
-	/*
-	* var
-	* 1     0     x
-	*/
-	// var :=
+	// Pad with 0s to the left if output is shorter than 20
+	for microsec.len < 20 {
+		microsec = '0${microsec}'
+	}
 
 	/*
 	* seq
+	* 8 bits
 	*/
-	// seq :=
+	micro_ts := '${int_adjts}${int_microsec}'
+	if micro_ts == gen.current_ts {
+		if gen.counter == 255 {
+			return error('Too many generations per microsecond.')
+			// TODO instead or returning error
+			// increment microsecond in ts
+			// reset counter to 0
+		}
+		gen.counter++
+	} else {
+		gen.current_ts = micro_ts
+		gen.counter = 0
+	}
+
+	mut seq := s.format_int(gen.counter, 2)
+
+	// Padding ensures that the binary representation of the counter always utilizes 8 bits.
+	for seq.len < 8 {
+		seq = '0${seq}'
+	}
 
 	/*
 	* rand
+	* 68 bits
 	*/
-	// rand :=
+	mut rand := ''
+	for rand.len < 68 {
+		new_bit := r.intn(2) or { 0 }
+		rand += '${new_bit}'
+	}
 
 	/*
 	* result
 	*/
-	// build result
-	return 'v2 to be implemented'
+	bin_res := '${adjts}${microsec}${seq}${rand}'
+
+	mut hex_res := ''
+	dash_index := [32, 48, 64, 80]
+	for i := 0; i < 128; i += 4 {
+		// add dash
+		if i in dash_index {
+			hex_res += '-'
+		}
+		// parse character
+		character := bin_res[i..i + 4]
+		to_int := s.parse_uint(character, 2, 4) or { return error('Could not parse integer') }
+		to_hex := to_int.hex()
+		hex_res += to_hex
+	}
+
+	return hex_res
 }
 
 pub fn parse_v2() {
