@@ -36,7 +36,7 @@ The suggested implementation was as follows:
 
 This version significantly deviates from UUID standards:
 - Dedicate 32 bits to the timestamp in seconds and adjust the start to a more recent date, January 1st 
-  2020. (Inspired by [KSUID](https://github.com/segmentio/ksuid))
+  2020 (inspired by [KSUID](https://github.com/segmentio/ksuid)).
 - Dedicate 20 bits in total to the microsecond precision, represented by the specific number of microseconds.
 - No version bits
 - No variant bits
@@ -60,4 +60,4 @@ I prefer to use this version of Lexical UUID in my programs.
 - I do not need strict UUID compatibility: Percona Server can still store and retrieve Lexical UUID 
   v2 with `UUID_TO_BIN()` and `BIN_TO_UUID()`, it does not matter to me if these are official UUID versions.
 - I do not generate more than 255 of these per microsecond: the rate at which Lexical UUID v2 are generated 
-  in my programs is not so high, to the point that the `seq` may even be superfluous.
+  in my programs is not so high, the `seq` may even be superfluous.
