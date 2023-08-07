@@ -5,21 +5,21 @@ import rand as r
 import strconv as s
 import time as t
 
-pub struct LexicalUUIDGenerator {
+pub struct Generator {
 mut:
 	current_ts t.Time
 	counter    int
 }
 
-// new_lexical_uuid_generator is the factory function that returns a new LexicalUUIDGenerator. Always
-// prefer utilizing the factory function.
-pub fn new_lexical_uuid_generator() &LexicalUUIDGenerator {
-	return &LexicalUUIDGenerator{}
+// new_generator is the factory function that returns a new Generator. Always prefer utilizing the factory
+// function.
+pub fn new_generator() &Generator {
+	return &Generator{}
 }
 
 // verify_ts potentially modifies generator fiels, it must be invoked before using generator fields
 // during the generation process.
-fn (mut gen LexicalUUIDGenerator) verify_ts(ts t.Time, duration t.Duration) {
+fn (mut gen Generator) verify_ts(ts t.Time, duration t.Duration) {
 	if ts == gen.current_ts {
 		// Rollover if counter exceeds capacity
 		if gen.counter == 255 {
@@ -68,7 +68,7 @@ fn build_result(binary_string string) !string {
 *
 */
 
-pub fn (mut gen LexicalUUIDGenerator) v1() !string {
+pub fn (mut gen Generator) v1() !string {
 	ts := t.utc()
 	gen.verify_ts(ts, 1 * t.nanosecond)
 
@@ -178,7 +178,7 @@ pub fn parse_v1() {
 *
 */
 
-pub fn (mut gen LexicalUUIDGenerator) v2() !string {
+pub fn (mut gen Generator) v2() !string {
 	ts := t.utc()
 	gen.verify_ts(ts, 1 * t.microsecond)
 
