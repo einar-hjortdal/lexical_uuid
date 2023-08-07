@@ -56,5 +56,8 @@ This version significantly deviates from UUID standards:
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ```
 
-I prefer to use this version of Lexical UUID in my programs. I do not need strict UUID compatibility
-and I do not generate more than 255 of these per microsecond.
+I prefer to use this version of Lexical UUID in my programs.
+- I do not need strict UUID compatibility: Percona Server can still store and retrieve Lexical UUID 
+  v2 with `UUID_TO_BIN()` and `BIN_TO_UUID()`, it does not matter to me if these are official UUID versions.
+- I do not generate more than 255 of these per microsecond: the rate at which Lexical UUID v2 are generated 
+  in my programs is not so high, to the point that the `seq` may even be superfluous.

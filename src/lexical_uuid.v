@@ -7,7 +7,7 @@ import time as t
 
 pub struct LexicalUUIDGenerator {
 mut:
-	current_ts string
+	current_ts t.Time
 	counter    int
 }
 
@@ -17,15 +17,68 @@ pub fn new_lexical_uuid_generator() &LexicalUUIDGenerator {
 	return &LexicalUUIDGenerator{}
 }
 
+// verify_ts potentially modifies generator fiels, it must be invoked before using generator fields
+// during the generation process.
+fn (mut gen LexicalUUIDGenerator) verify_ts(ts t.Time, duration t.Duration) {
+	if ts == gen.current_ts {
+		// Rollover if counter exceeds capacity
+		if gen.counter == 255 {
+			gen.current_ts = ts.add(duration)
+			gen.counter = 0
+		} else {
+			gen.counter++
+		}
+	} else {
+		// Generating past the rollover
+		if ts < gen.current_ts && gen.current_ts == ts.add(duration) {
+			// This handles only one rollover, it is assumed the counter may be needed in bursts, not continuously.
+			// Totals up to 510 billion Lexical UUID v1 per second.
+			// Totals up to 510 million Lexical UUID v2 per second.
+			gen.counter++
+		} else {
+			gen.current_ts = ts
+			gen.counter = 0
+		}
+	}
+}
+
+fn build_result(binary_string string) !string {
+	mut hex_res := ''
+	dash_index := [32, 48, 64, 80]
+	for i := 0; i < 128; i += 4 {
+		// add dash
+		if i in dash_index {
+			hex_res += '-'
+		}
+		// parse character
+		character := binary_string[i..i + 4]
+		to_int := s.parse_uint(character, 2, 4) or {
+			return error('Could not parse integer')
+			// TODO do not return error
+		}
+		to_hex := to_int.hex()
+		hex_res += to_hex
+	}
+	return hex_res
+}
+
+/*
+*
+* Version 1
+*
+*/
+
 pub fn (mut gen LexicalUUIDGenerator) v1() !string {
+	ts := t.utc()
+	gen.verify_ts(ts, 1 * t.nanosecond)
+
 	/*
 	* unixts
 	* 36 bits
 	*
 	* Seconds since 1st January 1970
 	*/
-	ts := t.utc()
-	mut unixts := s.format_uint(u64(ts.unix), 2)
+	mut unixts := s.format_uint(u64(gen.current_ts.unix), 2)
 
 	// Pad with 0s to the left if output is shorter than 36
 	for unixts.len < 36 {
@@ -38,7 +91,7 @@ pub fn (mut gen LexicalUUIDGenerator) v1() !string {
 	*
 	* The nanosecond field is supposed to be a fraction as opposed to the specific number of nanoseconds.
 	*/
-	sec := f64(ts.nanosecond) / 1_000_000_000
+	sec := f64(gen.current_ts.nanosecond) / 1_000_000_000
 	// scale_factor ensures that the binary representation utilizes a maximum of 38 bits.
 	scale_factor := m.exp2(38)
 	float_nsec := sec / (1.0 / scale_factor)
@@ -79,18 +132,9 @@ pub fn (mut gen LexicalUUIDGenerator) v1() !string {
 	*
 	* The maximum number of generations per nanosecond is of 255 (111111 or FF). Exceeding 255 generations
 	* per nanosecond is very unlikely.
+	*
+	* Counter increment and rollover is handled by `gen.verify_ts`.
 	*/
-	nano_ts := '${unixts}${ts.nanosecond}'
-	if nano_ts == gen.current_ts {
-		if gen.counter == 255 {
-			return error('Too many generations per nanosecond.')
-		}
-		gen.counter++
-	} else {
-		gen.current_ts = nano_ts
-		gen.counter = 0
-	}
-
 	mut seq := s.format_int(gen.counter, 2)
 
 	// Padding ensures that the binary representation of the counter always utilizes 8 bits.
@@ -120,26 +164,6 @@ pub fn (mut gen LexicalUUIDGenerator) v1() !string {
 	return build_result(bin_res)!
 }
 
-fn build_result(binary_string string) !string {
-	mut hex_res := ''
-	dash_index := [32, 48, 64, 80]
-	for i := 0; i < 128; i += 4 {
-		// add dash
-		if i in dash_index {
-			hex_res += '-'
-		}
-		// parse character
-		character := binary_string[i..i + 4]
-		to_int := s.parse_uint(character, 2, 4) or {
-			return error('Could not parse integer')
-			// TODO do not return error
-		}
-		to_hex := to_int.hex()
-		hex_res += to_hex
-	}
-	return hex_res
-}
-
 pub fn parse_v1() {
 	// from binary to number of nanoseconds:
 	// back_1 := s.parse_uint(bin_nsec, 2, 64) or { panic(err) }
@@ -148,7 +172,16 @@ pub fn parse_v1() {
 	// println(u64(m.round(back_2 * 1000000000)))
 }
 
+/*
+*
+* Version 2
+*
+*/
+
 pub fn (mut gen LexicalUUIDGenerator) v2() !string {
+	ts := t.utc()
+	gen.verify_ts(ts, 1 * t.microsecond)
+
 	/*
 	* adjts
 	* 32 bits
@@ -157,8 +190,7 @@ pub fn (mut gen LexicalUUIDGenerator) v2() !string {
 	*/
 	modern_epoch := 1577836800
 
-	ts := t.utc()
-	int_adjts := ts.unix - modern_epoch
+	int_adjts := gen.current_ts.unix - modern_epoch
 	mut adjts := s.format_uint(u64(int_adjts), 2)
 
 	// Pad with 0s to the left if output is shorter than 32
@@ -172,7 +204,7 @@ pub fn (mut gen LexicalUUIDGenerator) v2() !string {
 	*
 	* The specific number of microseconds.
 	*/
-	int_microsec := ts.nanosecond / 1000
+	int_microsec := gen.current_ts.nanosecond / 1000
 	mut microsec := s.format_uint(u64(int_microsec), 2)
 
 	// Pad with 0s to the left if output is shorter than 20
@@ -184,20 +216,6 @@ pub fn (mut gen LexicalUUIDGenerator) v2() !string {
 	* seq
 	* 8 bits
 	*/
-	micro_ts := '${int_adjts}${int_microsec}'
-	if micro_ts == gen.current_ts {
-		if gen.counter == 255 {
-			return error('Too many generations per microsecond.')
-			// TODO instead or returning error
-			// increment microsecond in ts
-			// reset counter to 0
-		}
-		gen.counter++
-	} else {
-		gen.current_ts = micro_ts
-		gen.counter = 0
-	}
-
 	mut seq := s.format_int(gen.counter, 2)
 
 	// Padding ensures that the binary representation of the counter always utilizes 8 bits.
