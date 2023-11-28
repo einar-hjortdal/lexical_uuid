@@ -5,6 +5,9 @@ import rand as r
 import strconv as s
 import time as t
 
+// epoch - 1st January 2020
+const modern_epoch = 1577836800
+
 pub struct Generator {
 mut:
 	current_ts t.Time
@@ -17,7 +20,7 @@ pub fn new_generator() &Generator {
 	return &Generator{}
 }
 
-// verify_ts potentially modifies generator fiels, it must be invoked before using generator fields
+// verify_ts potentially modifies generator fields, it must be invoked before using generator fields
 // during the generation process.
 fn (mut gen Generator) verify_ts(ts t.Time, duration t.Duration) {
 	if ts == gen.current_ts {
@@ -188,9 +191,7 @@ pub fn (mut gen Generator) v2() !string {
 	*
 	* Seconds since 1st January 2020.
 	*/
-	modern_epoch := 1577836800
-
-	int_adjts := gen.current_ts.unix - modern_epoch
+	int_adjts := gen.current_ts.unix - luuid.modern_epoch
 	mut adjts := s.format_uint(u64(int_adjts), 2)
 
 	// Pad with 0s to the left if output is shorter than 32
@@ -242,4 +243,54 @@ pub fn (mut gen Generator) v2() !string {
 }
 
 pub fn parse_v2() {
+}
+
+// TODO DRY
+pub fn v3() !string {
+	ts := t.utc()
+
+	/*
+	* adjts
+	* 32 bits
+	*
+	* Seconds since 1st January 2020.
+	*/
+	int_adjts := ts.unix - luuid.modern_epoch
+	mut adjts := s.format_uint(u64(int_adjts), 2)
+
+	// Pad with 0s to the left if output is shorter than 32
+	for adjts.len < 32 {
+		adjts = '0${adjts}'
+	}
+
+	/*
+	* µsec
+	* 20 bits
+	*
+	* The specific number of microseconds.
+	*/
+	int_microsec := ts.nanosecond / 1000
+	mut microsec := s.format_uint(u64(int_microsec), 2)
+
+	// Pad with 0s to the left if output is shorter than 20
+	for microsec.len < 20 {
+		microsec = '0${microsec}'
+	}
+
+	/*
+	* rand
+	* 76 bits
+	*/
+	mut rand := ''
+	for rand.len < 76 {
+		new_bit := r.intn(2) or { 0 }
+		rand += '${new_bit}'
+	}
+
+	/*
+	* result
+	*/
+	bin_res := '${adjts}${microsec}${rand}'
+
+	return build_result(bin_res)!
 }
