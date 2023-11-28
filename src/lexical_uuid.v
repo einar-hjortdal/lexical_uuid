@@ -7,6 +7,7 @@ import time as t
 
 // epoch - 1st January 2020
 const modern_epoch = 1577836800
+const luuid_length = 36
 
 pub struct Generator {
 mut:
@@ -167,12 +168,61 @@ pub fn (mut gen Generator) v1() !string {
 	return build_result(bin_res)!
 }
 
-pub fn parse_v1() {
+pub fn parse_v1(id string) ! {
+	// bin := verify_string(id)!
 	// from binary to number of nanoseconds:
 	// back_1 := s.parse_uint(bin_nsec, 2, 64) or { panic(err) }
 	// back_2 := back_1 * divisor
 	// println(back_1)
 	// println(u64(m.round(back_2 * 1000000000)))
+}
+
+// verify_string accepts LUUID with or without hyphens.
+// Returns the binary representation of the string for further parsing.
+// Returns an error if the string does not match the expected format.
+pub fn verify(id string) !string {
+	if id.len == luuid.luuid_length || id.len == luuid.luuid_length - 4 {
+		// Verify hyphens
+		if id.len == luuid.luuid_length {
+			if id.count('-') == 4 {
+				stripped_id := handle_hyphens(id)!
+				return hex_to_bin(stripped_id)
+			}
+		}
+		// Verify no hyphens
+		if id.count('-') == 0 {
+			return hex_to_bin(id)
+		}
+	}
+	return error('The provided string is not a Lexical UUID')
+}
+
+fn handle_hyphens(id string) !string {
+	expected_idx := [8, 13, 18, 23]
+	// verify hypens position
+	for idx in expected_idx {
+		if id[idx] != 45 { // ascii 45 is a hyphen
+			return error('Hyphen missing or in wrong position')
+		}
+	}
+	// remove hyphens
+	return id.replace('-', '')
+}
+
+// hex_to_bin returns a binary string given the hex string.
+fn hex_to_bin(id string) !string {
+	mut bin := ''
+	chars := id.split('')
+	for c in chars {
+		parsed_hex := c.parse_int(16, 64)!
+		mut res := s.format_int(parsed_hex, 2)
+		// pad left
+		for res.len < 4 {
+			res = '0${res}'
+		}
+		bin += res
+	}
+	return bin
 }
 
 /*
@@ -242,8 +292,9 @@ pub fn (mut gen Generator) v2() !string {
 	return build_result(bin_res)!
 }
 
-pub fn parse_v2() {
-}
+// pub fn parse_v2(id string) ! {
+// 	bin := verify_string(id)!
+// }
 
 // TODO DRY
 pub fn v3() !string {
@@ -293,4 +344,9 @@ pub fn v3() !string {
 	bin_res := '${adjts}${microsec}${rand}'
 
 	return build_result(bin_res)!
+}
+
+pub fn parse_v3(id string) !string {
+	bin := verify(id)!
+	return bin
 }
