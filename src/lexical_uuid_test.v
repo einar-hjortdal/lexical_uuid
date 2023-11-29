@@ -42,7 +42,10 @@ fn test_verify() {
 	}
 
 	invalid_v4_longer := uuid_v4 + '0'
-	verify(stripped_v4) or { assert true }
+	verify(invalid_v4_longer) or { assert true }
+
+	invalid_v4_shorter := uuid_v4[0..30]
+	verify(invalid_v4_shorter) or { assert true }
 
 	mut g := new_generator()
 	luuid_v1 := g.v1() or { panic(err) }
