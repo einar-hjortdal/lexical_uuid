@@ -1,6 +1,6 @@
 module luuid
 
-import strconv
+import rand
 
 // bin_to_hex wraps build_result, returns a hex string given a binary string.
 fn bin_to_hex(s string) !string {
@@ -25,9 +25,36 @@ fn test_v2() {
 
 fn test_v3() {
 	mut res := v3() or { panic(err) }
-	println(res)
-	bin := parse_v3(res) or { panic(err) }
-	println(bin)
-	res = bin_to_hex(bin) or { panic(err) }
-	println(res)
+	// TODO parse
+}
+
+fn test_verify() {
+	uuid_v4 := rand.uuid_v4()
+	verify(uuid_v4) or {
+		println(err)
+		assert false
+		return
+	}
+
+	mut g := new_generator()
+	luuid_v1 := g.v1() or { panic(err) }
+	verify(luuid_v1) or {
+		println(err)
+		assert false
+		return
+	}
+
+	luuid_v2 := g.v2() or { panic(err) }
+	verify(luuid_v2) or {
+		println(err)
+		assert false
+		return
+	}
+
+	luuid_v3 := v3() or { panic(err) }
+	verify(luuid_v3) or {
+		println(err)
+		assert false
+		return
+	}
 }

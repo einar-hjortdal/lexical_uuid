@@ -168,14 +168,14 @@ pub fn (mut gen Generator) v1() !string {
 	return build_result(bin_res)!
 }
 
-pub fn parse_v1(id string) ! {
-	// bin := verify_string(id)!
-	// from binary to number of nanoseconds:
-	// back_1 := s.parse_uint(bin_nsec, 2, 64) or { panic(err) }
-	// back_2 := back_1 * divisor
-	// println(back_1)
-	// println(u64(m.round(back_2 * 1000000000)))
-}
+// pub fn parse_v1(id string) ! {
+// bin := verify_string(id)!
+// from binary to number of nanoseconds:
+// back_1 := s.parse_uint(bin_nsec, 2, 64) or { panic(err) }
+// back_2 := back_1 * divisor
+// println(back_1)
+// println(u64(m.round(back_2 * 1000000000)))
+// }
 
 // verify_string accepts LUUID with or without hyphens.
 // Returns the binary representation of the string for further parsing.
@@ -346,7 +346,5 @@ pub fn v3() !string {
 	return build_result(bin_res)!
 }
 
-pub fn parse_v3(id string) !string {
-	bin := verify(id)!
-	return bin
-}
+// pub fn parse_v3(id string) ! {
+// }
