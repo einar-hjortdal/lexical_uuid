@@ -91,3 +91,7 @@ The lack of monotonic clock sequence allows generation without a generator.
 This version should not be utilized when the generation rate is higher than 1 per microsecond: despite 
 the large random portion, it is still less random than a standard UUIDv4 and collision could occur.
 P.S. I have not calculated the exact collision rate risk, but you have been warned!
+
+## Utility functions
+
+This module also exports some utility functions for working with standard and Lexical UUID.

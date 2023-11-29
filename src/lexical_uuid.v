@@ -180,6 +180,7 @@ pub fn (mut gen Generator) v1() !string {
 // verify_string accepts LUUID with or without hyphens.
 // Returns the binary representation of the string for further parsing.
 // Returns an error if the string does not match the expected format.
+// This function is useful to verify whether a string is a seemingly-valid UUID.
 pub fn verify(id string) !string {
 	if id.len == luuid.luuid_length || id.len == luuid.luuid_length - 4 {
 		// Verify hyphens
