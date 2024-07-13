@@ -15,8 +15,8 @@ mut:
 	counter    int
 }
 
-// new_generator is the factory function that returns a new Generator. Always prefer utilizing the factory
-// function.
+// new_generator is the factory function that returns a new Generator.
+// Always prefer utilizing the factory function.
 pub fn new_generator() &Generator {
 	return &Generator{}
 }
@@ -82,7 +82,7 @@ pub fn (mut gen Generator) v1() !string {
 	*
 	* Seconds since 1st January 1970
 	*/
-	mut unixts := s.format_uint(u64(gen.current_ts.unix), 2)
+	mut unixts := s.format_uint(u64(gen.current_ts.unix()), 2)
 
 	// Pad with 0s to the left if output is shorter than 36
 	for unixts.len < 36 {
@@ -242,7 +242,7 @@ pub fn (mut gen Generator) v2() !string {
 	*
 	* Seconds since 1st January 2020.
 	*/
-	int_adjts := gen.current_ts.unix - luuid.modern_epoch
+	int_adjts := gen.current_ts.unix() - luuid.modern_epoch
 	mut adjts := s.format_uint(u64(int_adjts), 2)
 
 	// Pad with 0s to the left if output is shorter than 32
@@ -307,7 +307,7 @@ pub fn v3() !string {
 	*
 	* Seconds since 1st January 2020.
 	*/
-	int_adjts := ts.unix - luuid.modern_epoch
+	int_adjts := ts.unix() - luuid.modern_epoch
 	mut adjts := s.format_uint(u64(int_adjts), 2)
 
 	// Pad with 0s to the left if output is shorter than 32
