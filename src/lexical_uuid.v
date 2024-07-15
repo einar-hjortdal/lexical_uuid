@@ -5,9 +5,9 @@ import rand as r
 import strconv as s
 import time as t
 
-// epoch - 1st January 2020
-const modern_epoch = 1577836800
-const luuid_length = 36
+const luuid_length = 32
+const luuid_length_with_hyphens = 36
+const hyphen_indexes = [8, 13, 18, 23]
 
 pub struct Generator {
 mut:
@@ -24,6 +24,7 @@ pub fn new_generator() &Generator {
 // verify_ts potentially modifies generator fields, it must be invoked before using generator fields
 // during the generation process.
 fn (mut gen Generator) verify_ts(ts t.Time, duration t.Duration) {
+	// TODO if ts > gen.current_ts there was an anomaly: hang generation, then continue.
 	if ts == gen.current_ts {
 		// Rollover if counter exceeds capacity
 		if gen.counter == 255 {
@@ -36,8 +37,7 @@ fn (mut gen Generator) verify_ts(ts t.Time, duration t.Duration) {
 		// Generating past the rollover
 		if ts < gen.current_ts && gen.current_ts == ts.add(duration) {
 			// This handles only one rollover, it is assumed the counter may be needed in bursts, not continuously.
-			// Totals up to 510 billion Lexical UUID v1 per second.
-			// Totals up to 510 million Lexical UUID v2 per second.
+			// TODO if exceeded, hang until clock increment.
 			gen.counter++
 		} else {
 			gen.current_ts = ts
@@ -46,24 +46,40 @@ fn (mut gen Generator) verify_ts(ts t.Time, duration t.Duration) {
 	}
 }
 
+fn verify_lack_hyphens(id string) ! {
+	if id.count('-') != 0 {
+		return error('Malformed LUUID')
+	}
+}
+
+// add_hyphens adds hyphens to a LUUID without hyphens.
+pub fn add_hyphens(id string) !string {
+	if id.len != luuid.luuid_length {
+		return error('ID too long or too short')
+	}
+	verify_lack_hyphens(id)!
+
+	mut res := id
+
+	len := luuid.hyphen_indexes.len
+	for i := 0; i < len; i++ {
+		hyphen_index := luuid.hyphen_indexes[i]
+		res = res[..hyphen_index] + '-' + res[hyphen_index..]
+	}
+	return res
+}
+
 fn build_result(binary_string string) !string {
 	mut hex_res := ''
-	dash_index := [32, 48, 64, 80]
 	for i := 0; i < 128; i += 4 {
-		// add dash
-		if i in dash_index {
-			hex_res += '-'
-		}
 		// parse character
 		character := binary_string[i..i + 4]
-		to_int := s.parse_uint(character, 2, 4) or {
-			return error('Could not parse integer')
-			// TODO do not return error
-		}
+		to_int := s.parse_uint(character, 2, 4) or { return error('Could not parse integer') }
 		to_hex := to_int.hex()
 		hex_res += to_hex
 	}
-	return hex_res
+	res := add_hyphens(hex_res)!
+	return res
 }
 
 /*
@@ -111,20 +127,10 @@ pub fn (mut gen Generator) v1() !string {
 	/*
 	* ver
 	*
-	* This is the implementation of a rejected UUID version 7.
 	* Version is set to 1 because it is the first implementation of the Lexical UUID.
 	* 0     0     0     1
 	*/
 	ver := '0001'
-
-	/*
-	* var
-	*
-	* This is the implementation of a rejected UUID version 7.
-	* It does not conform to any official standard, but it pretends to do so because it was meant to.
-	* 1     0     x
-	*/
-	var := '10'
 
 	/*
 	* seq
@@ -151,7 +157,7 @@ pub fn (mut gen Generator) v1() !string {
 	* 40 bits
 	*/
 	mut rand := ''
-	for rand.len < 40 {
+	for rand.len < 42 {
 		new_bit := r.intn(2) or { 0 }
 		rand += '${new_bit}'
 	}
@@ -160,57 +166,51 @@ pub fn (mut gen Generator) v1() !string {
 	* result
 	*/
 	nsec_1 := nsec[0..12]
-	nsec_2 := nsec[12..24]
-	nsec_3 := nsec[24..38]
+	nsec_2 := nsec[12..38]
 
-	bin_res := '${unixts}${nsec_1}${ver}${nsec_2}${var}${nsec_3}${seq}${rand}'
+	bin_res := '${unixts}${nsec_1}${ver}${nsec_2}${nsec_2}${seq}${rand}'
 
 	return build_result(bin_res)!
 }
 
-// pub fn parse_v1(id string) ! {
-// bin := verify_string(id)!
-// from binary to number of nanoseconds:
-// back_1 := s.parse_uint(bin_nsec, 2, 64) or { panic(err) }
-// back_2 := back_1 * divisor
-// println(back_1)
-// println(u64(m.round(back_2 * 1000000000)))
-// }
-
-// verify_string accepts LUUID with or without hyphens.
-// Returns the binary representation of the string for further parsing.
-// Returns an error if the string does not match the expected format.
-// This function is useful to verify whether a string is a seemingly-valid UUID.
-pub fn verify(id string) !string {
-	if id.len == luuid.luuid_length || id.len == luuid.luuid_length - 4 {
-		// Verify hyphens
-		if id.len == luuid.luuid_length {
-			if id.count('-') == 4 {
-				stripped_id := handle_hyphens(id)!
-				return hex_to_bin(stripped_id)
-			}
-		}
-		// Verify no hyphens
-		if id.count('-') == 0 {
-			return hex_to_bin(id)
-		}
+fn verify_luuid_length(id string) ! {
+	if id.len != luuid.luuid_length && id.len != luuid.luuid_length_with_hyphens {
+		return error('The provided ID is too long or too short')
 	}
-	return error('The provided string is not a Lexical UUID')
 }
 
-fn handle_hyphens(id string) !string {
-	expected_idx := [8, 13, 18, 23]
-	// verify hypens position
-	for idx in expected_idx {
+fn verify_hypens_amount(id string) ! {
+	if id.count('-') != 4 {
+		return error('Unexpected number of hyphens')
+	}
+}
+
+fn verify_hypens_position(id string) ! {
+	for idx in luuid.hyphen_indexes {
 		if id[idx] != 45 { // ascii 45 is a hyphen
 			return error('Hyphen missing or in wrong position')
 		}
 	}
-	// remove hyphens
-	return id.replace('-', '')
 }
 
-// hex_to_bin returns a binary string given the hex string.
+// verify accepts LUUID with or without hyphens.
+// Returns the binary representation of the string for further parsing.
+// Returns an error if the string does not match the expected format.
+// This function is useful to verify whether a string is a seemingly-valid UUID.
+fn verify(id string) !string {
+	verify_luuid_length(id)!
+	if id.len == luuid.luuid_length_with_hyphens {
+		verify_hypens_amount(id)!
+		verify_hypens_position(id)!
+		luuid_without_hyphens := id.replace('-', '')
+		return hex_to_bin(luuid_without_hyphens)
+	}
+
+	verify_lack_hyphens(id)!
+	return hex_to_bin(id)
+}
+
+// hex_to_bin returns a binary string from the given hex string.
 fn hex_to_bin(id string) !string {
 	mut bin := ''
 	chars := id.split('')
@@ -226,126 +226,68 @@ fn hex_to_bin(id string) !string {
 	return bin
 }
 
+struct Luuid {
+	timestamp t.Time
+	version   int
+}
+
+fn parse_v1(id string) !Luuid {
+	return error('TODO not implemented')
+}
+
+fn parse_v2(id string) !Luuid {
+	return error('TODO not implemented')
+}
+
+pub fn parse(id string) !Luuid {
+	bin := verify(id)!
+	version := bin[48..52]
+	if version == '0001' {
+		return parse_v1(id)
+	}
+	if version == '0010' {
+		return parse_v2(id)
+	}
+	return error('The ID is not a Luuid')
+}
+
 /*
 *
 * Version 2
 *
 */
 
-pub fn (mut gen Generator) v2() !string {
+// v2 does not use a generator and does not contain monotonic counter bits.
+pub fn v2() !string {
 	ts := t.utc()
-	gen.verify_ts(ts, 1 * t.microsecond)
-
-	/*
-	* adjts
-	* 32 bits
-	*
-	* Seconds since 1st January 2020.
-	*/
-	int_adjts := gen.current_ts.unix() - luuid.modern_epoch
-	mut adjts := s.format_uint(u64(int_adjts), 2)
-
-	// Pad with 0s to the left if output is shorter than 32
-	for adjts.len < 32 {
-		adjts = '0${adjts}'
+	mut unixts := s.format_uint(u64(ts.unix()), 2)
+	for unixts.len < 36 {
+		unixts = '0${unixts}'
 	}
 
-	/*
-	* µsec
-	* 20 bits
-	*
-	* The specific number of microseconds.
-	*/
-	int_microsec := gen.current_ts.nanosecond / 1000
-	mut microsec := s.format_uint(u64(int_microsec), 2)
+	sec := f64(ts.nanosecond) / 1_000_000_000
+	scale_factor := m.exp2(38)
+	float_nsec := sec / (1.0 / scale_factor)
+	int_nsec := u64(float_nsec)
+	bin_nsec := s.format_uint(int_nsec, 2)
 
-	// Pad with 0s to the left if output is shorter than 20
-	for microsec.len < 20 {
-		microsec = '0${microsec}'
+	mut nsec := bin_nsec
+	for nsec.len < 38 {
+		nsec = '0${nsec}'
 	}
 
-	/*
-	* seq
-	* 8 bits
-	*/
-	mut seq := s.format_int(gen.counter, 2)
+	ver := '0010'
 
-	// Padding ensures that the binary representation of the counter always utilizes 8 bits.
-	for seq.len < 8 {
-		seq = '0${seq}'
-	}
-
-	/*
-	* rand
-	* 68 bits
-	*/
 	mut rand := ''
-	for rand.len < 68 {
+	for rand.len < 50 {
 		new_bit := r.intn(2) or { 0 }
 		rand += '${new_bit}'
 	}
 
-	/*
-	* result
-	*/
-	bin_res := '${adjts}${microsec}${seq}${rand}'
+	nsec_1 := nsec[0..12]
+	nsec_2 := nsec[12..38]
+
+	bin_res := '${unixts}${nsec_1}${ver}${nsec_2}${rand}'
 
 	return build_result(bin_res)!
 }
-
-// pub fn parse_v2(id string) ! {
-// 	bin := verify_string(id)!
-// }
-
-// TODO DRY
-pub fn v3() !string {
-	ts := t.utc()
-
-	/*
-	* adjts
-	* 32 bits
-	*
-	* Seconds since 1st January 2020.
-	*/
-	int_adjts := ts.unix() - luuid.modern_epoch
-	mut adjts := s.format_uint(u64(int_adjts), 2)
-
-	// Pad with 0s to the left if output is shorter than 32
-	for adjts.len < 32 {
-		adjts = '0${adjts}'
-	}
-
-	/*
-	* µsec
-	* 20 bits
-	*
-	* The specific number of microseconds.
-	*/
-	int_microsec := ts.nanosecond / 1000
-	mut microsec := s.format_uint(u64(int_microsec), 2)
-
-	// Pad with 0s to the left if output is shorter than 20
-	for microsec.len < 20 {
-		microsec = '0${microsec}'
-	}
-
-	/*
-	* rand
-	* 76 bits
-	*/
-	mut rand := ''
-	for rand.len < 76 {
-		new_bit := r.intn(2) or { 0 }
-		rand += '${new_bit}'
-	}
-
-	/*
-	* result
-	*/
-	bin_res := '${adjts}${microsec}${rand}'
-
-	return build_result(bin_res)!
-}
-
-// pub fn parse_v3(id string) ! {
-// }

@@ -1,4 +1,5 @@
 # TODO
 
-- Remove error type returns. Lexical UUID generation should not be a source of errors.
-- Parse functions
+- Verify newly generated timestamp is larger than the previous.
+- Utils:
+  - parse: extract timestamp and version from luuid.
