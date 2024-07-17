@@ -6,9 +6,10 @@ import strconv as s
 import time as t
 
 const luuid_length = 32
-const luuid_length_with_hyphens = 36
 const hyphen_indexes = [8, 13, 18, 23]
+const luuid_length_with_hyphens = luuid_length + hyphen_indexes.len
 
+// TODO mutex?
 pub struct Generator {
 mut:
 	current_ts t.Time
@@ -46,7 +47,7 @@ fn (mut gen Generator) verify_ts(ts t.Time, duration t.Duration) {
 	}
 }
 
-fn verify_lack_hyphens(id string) ! {
+fn verify_lacks_hyphens(id string) ! {
 	if id.count('-') != 0 {
 		return error('Malformed LUUID')
 	}
@@ -57,7 +58,7 @@ pub fn add_hyphens(id string) !string {
 	if id.len != luuid.luuid_length {
 		return error('ID too long or too short')
 	}
-	verify_lack_hyphens(id)!
+	verify_lacks_hyphens(id)!
 
 	mut res := id
 
@@ -168,7 +169,7 @@ pub fn (mut gen Generator) v1() !string {
 	nsec_1 := nsec[0..12]
 	nsec_2 := nsec[12..38]
 
-	bin_res := '${unixts}${nsec_1}${ver}${nsec_2}${nsec_2}${seq}${rand}'
+	bin_res := '${unixts}${nsec_1}${ver}${nsec_2}${seq}${rand}'
 
 	return build_result(bin_res)!
 }
@@ -206,7 +207,7 @@ fn verify(id string) !string {
 		return hex_to_bin(luuid_without_hyphens)
 	}
 
-	verify_lack_hyphens(id)!
+	verify_lacks_hyphens(id)!
 	return hex_to_bin(id)
 }
 
