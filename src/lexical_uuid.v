@@ -83,6 +83,27 @@ fn build_result(binary_string string) !string {
 	return res
 }
 
+fn pad_left_with_zeroes(binary_string string, desired_length int) !string {
+	if binary_string.len > desired_length {
+		return error('binary_string longer than desired.')
+	}
+
+	mut res := binary_string
+	for res.len < desired_length {
+		res = '0${res}'
+	}
+	return res
+}
+
+fn generate_random_bits(desired_length int) string {
+	mut res := ''
+	for res.len < desired_length {
+		new_bit := r.intn(2) or { 0 }
+		res += '${new_bit}'
+	}
+	return res
+}
+
 /*
 *
 * Version 1
@@ -97,33 +118,24 @@ pub fn (mut gen Generator) v1() !string {
 	* unixts
 	* 36 bits
 	*
-	* Seconds since 1st January 1970
+	* Seconds since 1st January 1970, can represent dates until the year 4147
 	*/
-	mut unixts := s.format_uint(u64(gen.current_ts.unix()), 2)
-
-	// Pad with 0s to the left if output is shorter than 36
-	for unixts.len < 36 {
-		unixts = '0${unixts}'
-	}
+	unpadded_unixts := s.format_uint(u64(gen.current_ts.unix()), 2)
+	unixts := pad_left_with_zeroes(unpadded_unixts, 36)!
 
 	/*
 	* nsec
 	* 38 bits
 	*
-	* The nanosecond field is supposed to be a fraction as opposed to the specific number of nanoseconds.
+	* The nanosecond field is supposed to be a fraction, not the number of nanoseconds.
 	*/
 	sec := f64(gen.current_ts.nanosecond) / 1_000_000_000
 	// scale_factor ensures that the binary representation utilizes a maximum of 38 bits.
 	scale_factor := m.exp2(38)
 	float_nsec := sec / (1.0 / scale_factor)
 	int_nsec := u64(float_nsec)
-	bin_nsec := s.format_uint(int_nsec, 2)
-
-	// Padding ensures that the binary representation always utilizes 38 bits.
-	mut nsec := bin_nsec
-	for nsec.len < 38 {
-		nsec = '0${nsec}'
-	}
+	unpadded_nsec := s.format_uint(int_nsec, 2)
+	nsec := pad_left_with_zeroes(unpadded_nsec, 38)!
 
 	/*
 	* ver
@@ -146,22 +158,14 @@ pub fn (mut gen Generator) v1() !string {
 	*
 	* Counter increment and rollover is handled by `gen.verify_ts`.
 	*/
-	mut seq := s.format_int(gen.counter, 2)
-
-	// Padding ensures that the binary representation of the counter always utilizes 8 bits.
-	for seq.len < 8 {
-		seq = '0${seq}'
-	}
+	unpadded_seq := s.format_int(gen.counter, 2)
+	seq := pad_left_with_zeroes(unpadded_seq, 8)!
 
 	/*
 	* rand
-	* 40 bits
+	* 42 bits
 	*/
-	mut rand := ''
-	for rand.len < 42 {
-		new_bit := r.intn(2) or { 0 }
-		rand += '${new_bit}'
-	}
+	rand := generate_random_bits(42)
 
 	/*
 	* result

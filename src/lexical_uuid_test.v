@@ -18,13 +18,7 @@ fn test_v1() {
 }
 
 fn test_v2() {
-	mut g := new_generator()
-	res := g.v2() or { panic(err) }
-	// TODO parse
-}
-
-fn test_v3() {
-	mut res := v3() or { panic(err) }
+	res := v2() or { panic(err) }
 	// TODO parse
 }
 
@@ -54,14 +48,8 @@ fn test_verify() {
 		return
 	}
 
-	luuid_v2 := g.v2() or { panic(err) }
+	luuid_v2 := v2() or { panic(err) }
 	verify(luuid_v2) or {
-		assert false
-		return
-	}
-
-	luuid_v3 := v3() or { panic(err) }
-	verify(luuid_v3) or {
 		assert false
 		return
 	}
