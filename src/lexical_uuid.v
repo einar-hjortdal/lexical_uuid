@@ -8,6 +8,7 @@ import time as t
 const luuid_length = 32
 const hyphen_indexes = [8, 13, 18, 23]
 const luuid_length_with_hyphens = luuid_length + hyphen_indexes.len
+const scale_factor = m.exp2(38)
 
 // TODO mutex?
 pub struct Generator {
@@ -131,8 +132,7 @@ pub fn (mut gen Generator) v1() !string {
 	*/
 	sec := f64(gen.current_ts.nanosecond) / 1_000_000_000
 	// scale_factor ensures that the binary representation utilizes a maximum of 38 bits.
-	scale_factor := m.exp2(38)
-	float_nsec := sec / (1.0 / scale_factor)
+	float_nsec := sec / (1.0 / luuid.scale_factor)
 	int_nsec := u64(float_nsec)
 	unpadded_nsec := s.format_uint(int_nsec, 2)
 	nsec := pad_left_with_zeroes(unpadded_nsec, 38)!
@@ -236,22 +236,37 @@ struct Luuid {
 	version   int
 }
 
-fn parse_v1(id string) !Luuid {
-	return error('TODO not implemented')
-}
+fn extract_timestamp(binary_id string) !t.Time {
+	bin_seconds := binary_id[..36]
+	seconds := s.parse_int(bin_seconds, 2, 64)!
 
-fn parse_v2(id string) !Luuid {
-	return error('TODO not implemented')
+	nsec_1 := binary_id[37..48]
+	nsec_2 := binary_id[53..78]
+	bin_nsec := '${nsec_1}${nsec_2}'
+	nsec_fraction := s.parse_uint(bin_nsec, 2, 64)!
+	float_nsec := f64(nsec_fraction) * (1 / luuid.scale_factor)
+	nsec := int(float_nsec * 1_000_000_000)
+
+	ts := t.unix_nanosecond(seconds, nsec)
+	return ts
 }
 
 pub fn parse(id string) !Luuid {
 	bin := verify(id)!
 	version := bin[48..52]
 	if version == '0001' {
-		return parse_v1(id)
+		ts := extract_timestamp(bin)!
+		return Luuid{
+			timestamp: ts
+			version: 1
+		}
 	}
 	if version == '0010' {
-		return parse_v2(id)
+		ts := extract_timestamp(bin)!
+		return Luuid{
+			timestamp: ts
+			version: 2
+		}
 	}
 	return error('The ID is not a Luuid')
 }
@@ -271,8 +286,7 @@ pub fn v2() !string {
 	}
 
 	sec := f64(ts.nanosecond) / 1_000_000_000
-	scale_factor := m.exp2(38)
-	float_nsec := sec / (1.0 / scale_factor)
+	float_nsec := sec / (1.0 / luuid.scale_factor)
 	int_nsec := u64(float_nsec)
 	bin_nsec := s.format_uint(int_nsec, 2)
 

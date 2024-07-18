@@ -54,3 +54,6 @@ fn test_verify() {
 		return
 	}
 }
+
+fn test_parse() {
+}
