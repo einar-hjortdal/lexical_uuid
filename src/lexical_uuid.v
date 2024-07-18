@@ -252,23 +252,27 @@ fn extract_timestamp(binary_id string) !t.Time {
 }
 
 pub fn parse(id string) !Luuid {
+	parse_error_message := 'The ID is not a Luuid'
 	bin := verify(id)!
+
 	version := bin[48..52]
 	if version == '0001' {
-		ts := extract_timestamp(bin)!
+		ts := extract_timestamp(bin) or { return error(parse_error_message) }
 		return Luuid{
 			timestamp: ts
 			version: 1
 		}
 	}
+
 	if version == '0010' {
-		ts := extract_timestamp(bin)!
+		ts := extract_timestamp(bin) or { return error(parse_error_message) }
 		return Luuid{
 			timestamp: ts
 			version: 2
 		}
 	}
-	return error('The ID is not a Luuid')
+
+	return error(parse_error_message)
 }
 
 /*
