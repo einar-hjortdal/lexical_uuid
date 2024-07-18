@@ -79,3 +79,10 @@ fn test_parse_v1() {
 	assert parsed.timestamp.unix() == ts.unix()
 	assert parsed.timestamp.nanosecond == ts.nanosecond
 }
+
+fn test_remove_hyphens() {
+	luuid_v2 := v2()!
+	luuid_without_hyphens := '${luuid_v2[..8]}${luuid_v2[9..13]}${luuid_v2[14..18]}${luuid_v2[19..23]}${luuid_v2[24..]}'
+	res := remove_hyphens(luuid_v2)
+	assert res == luuid_without_hyphens
+}

@@ -46,6 +46,10 @@ fn (mut gen Generator) verify_ts(ts t.Time, duration t.Duration) {
 	}
 }
 
+pub fn remove_hyphens(id string) string {
+	return id.replace('-', '')
+}
+
 fn verify_lacks_hyphens(id string) ! {
 	if id.count('-') != 0 {
 		return error('Malformed LUUID')
