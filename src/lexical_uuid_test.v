@@ -16,12 +16,12 @@ fn bin_to_hex(s string) !string {
 fn test_v1() {
 	mut g := new_generator()
 	res := g.v1() or { panic(err) }
-	// TODO parse
+	assert res.len == 36
 }
 
 fn test_v2() {
 	res := v2() or { panic(err) }
-	// TODO parse
+	assert res.len == 36
 }
 
 fn test_verify() {
@@ -61,13 +61,11 @@ fn replace_luuid_timestamp(luuid_string string, ts time.Time) string {
 	bin_id := verify(luuid_string) or { panic(err) }
 	ts_seconds := ts.unix()
 	unixts := pad_left_with_zeroes(strconv.format_uint(u64(ts.unix()), 2), 36) or { panic(err) }
-	sec := f64(ts.nanosecond) / 1_000_000_000
-	uint_nsec := u64(sec / (1.0 / scale_factor))
-	bin_nsec := strconv.format_uint(uint_nsec, 2)
-	nsec := pad_left_with_zeroes(bin_nsec, 38) or { panic(err) }
+	bin_nsec := strconv.format_uint(u64(ts.nanosecond), 2)
+	nsec := pad_left_with_zeroes(bin_nsec, 30) or { panic(err) }
 	nsec_1 := nsec[0..12]
-	nsec_2 := nsec[12..38]
-	bin_res := '${unixts}${nsec_1}${bin_id[48..52]}${nsec_2}${bin_id[78..]}' // TODO currently replaces counter in v1
+	nsec_2 := nsec[12..]
+	bin_res := '${unixts}${nsec_1}${bin_id[48..52]}${nsec_2}${bin_id[70..]}' // TODO currently replaces counter in v1
 	res := build_result(bin_res) or { panic(err) }
 	return res
 }
@@ -79,9 +77,5 @@ fn test_parse_v1() {
 	luuid_with_known_timestamp := replace_luuid_timestamp(luuid_v1, ts)
 	parsed := parse(luuid_with_known_timestamp) or { panic(err) }
 	assert parsed.timestamp.unix() == ts.unix()
-	// Because of the conversion from integer to float, and back then back from float to integer,
-	// rounding may result in 1 nanosecond more or less difference.
 	assert parsed.timestamp.nanosecond == ts.nanosecond
-		|| parsed.timestamp.nanosecond == ts.nanosecond - 1
-		|| parsed.timestamp.nanosecond == ts.nanosecond + 1
 }

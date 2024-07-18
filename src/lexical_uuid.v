@@ -1,6 +1,5 @@
 module luuid
 
-import math as m
 import rand as r
 import strconv as s
 import time as t
@@ -8,7 +7,6 @@ import time as t
 const luuid_length = 32
 const hyphen_indexes = [8, 13, 18, 23]
 const luuid_length_with_hyphens = luuid_length + hyphen_indexes.len
-const scale_factor = m.exp2(38)
 
 // TODO mutex?
 pub struct Generator {
@@ -126,16 +124,11 @@ pub fn (mut gen Generator) v1() !string {
 
 	/*
 	* nsec
-	* 38 bits
-	*
-	* The nanosecond field is supposed to be a fraction, not the number of nanoseconds.
+	* 30 bits
 	*/
-	sec := f64(gen.current_ts.nanosecond) / 1_000_000_000
-	// scale_factor ensures that the binary representation utilizes a maximum of 38 bits.
-	float_nsec := sec / (1.0 / luuid.scale_factor)
-	int_nsec := u64(float_nsec)
-	unpadded_nsec := s.format_uint(int_nsec, 2)
-	nsec := pad_left_with_zeroes(unpadded_nsec, 38)!
+	int_nsec := gen.current_ts.nanosecond
+	unpadded_nsec := s.format_int(int_nsec, 2)
+	nsec := pad_left_with_zeroes(unpadded_nsec, 30)!
 
 	/*
 	* ver
@@ -165,13 +158,13 @@ pub fn (mut gen Generator) v1() !string {
 	* rand
 	* 42 bits
 	*/
-	rand := generate_random_bits(42)
+	rand := generate_random_bits(50)
 
 	/*
 	* result
 	*/
 	nsec_1 := nsec[0..12]
-	nsec_2 := nsec[12..38]
+	nsec_2 := nsec[12..]
 
 	bin_res := '${unixts}${nsec_1}${ver}${nsec_2}${seq}${rand}'
 
@@ -241,13 +234,11 @@ fn extract_timestamp(binary_id string) !t.Time {
 	seconds := s.parse_int(bin_seconds, 2, 64)!
 
 	nsec_1 := binary_id[36..48]
-	nsec_2 := binary_id[52..78]
+	nsec_2 := binary_id[52..70]
 	bin_nsec := '${nsec_1}${nsec_2}'
-	nsec_fraction := s.parse_uint(bin_nsec, 2, 64)!
-	float_nsec := f64(nsec_fraction) * (1 / luuid.scale_factor)
-	nsec := int(float_nsec * 1_000_000_000)
+	nsec := s.parse_int(bin_nsec, 2, 32)!
 
-	ts := t.unix_nanosecond(seconds, nsec)
+	ts := t.unix_nanosecond(seconds, int(nsec))
 	return ts
 }
 
@@ -286,17 +277,16 @@ pub fn v2() !string {
 	ts := t.utc()
 	unixts := pad_left_with_zeroes(s.format_uint(u64(ts.unix()), 2), 36)!
 
-	sec := f64(ts.nanosecond) / 1_000_000_000
-	uint_nsec := u64(sec / (1.0 / luuid.scale_factor))
-	bin_nsec := s.format_uint(uint_nsec, 2)
-	nsec := pad_left_with_zeroes(bin_nsec, 38)!
+	int_nsec := ts.nanosecond
+	unpadded_nsec := s.format_int(int_nsec, 2)
+	nsec := pad_left_with_zeroes(unpadded_nsec, 30)!
 
 	ver := '0010'
 
-	rand := generate_random_bits(50)
+	rand := generate_random_bits(58)
 
 	nsec_1 := nsec[0..12]
-	nsec_2 := nsec[12..38]
+	nsec_2 := nsec[12..]
 
 	bin_res := '${unixts}${nsec_1}${ver}${nsec_2}${rand}'
 

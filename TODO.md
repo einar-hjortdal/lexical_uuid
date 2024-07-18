@@ -1,5 +1,4 @@
 # TODO
 
 - Verify newly generated timestamp is larger than the previous.
-- Utils:
-  - parse: extract timestamp and version from luuid.
+- Refactor: avoid string operations for more efficient generation.
