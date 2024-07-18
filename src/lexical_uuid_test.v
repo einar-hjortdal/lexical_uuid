@@ -67,7 +67,7 @@ fn replace_luuid_timestamp(luuid_string string, ts time.Time) string {
 	nsec := pad_left_with_zeroes(bin_nsec, 38) or { panic(err) }
 	nsec_1 := nsec[0..12]
 	nsec_2 := nsec[12..38]
-	bin_res := '${unixts}${nsec_1}${bin_id[48..52]}${nsec_2}${bin_id[78..]}'
+	bin_res := '${unixts}${nsec_1}${bin_id[48..52]}${nsec_2}${bin_id[78..]}' // TODO currently replaces counter in v1
 	res := build_result(bin_res) or { panic(err) }
 	return res
 }
