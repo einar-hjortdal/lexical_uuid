@@ -240,8 +240,8 @@ fn extract_timestamp(binary_id string) !t.Time {
 	bin_seconds := binary_id[..36]
 	seconds := s.parse_int(bin_seconds, 2, 64)!
 
-	nsec_1 := binary_id[37..48]
-	nsec_2 := binary_id[53..78]
+	nsec_1 := binary_id[36..48]
+	nsec_2 := binary_id[52..78]
 	bin_nsec := '${nsec_1}${nsec_2}'
 	nsec_fraction := s.parse_uint(bin_nsec, 2, 64)!
 	float_nsec := f64(nsec_fraction) * (1 / luuid.scale_factor)
@@ -284,28 +284,16 @@ pub fn parse(id string) !Luuid {
 // v2 does not use a generator and does not contain monotonic counter bits.
 pub fn v2() !string {
 	ts := t.utc()
-	mut unixts := s.format_uint(u64(ts.unix()), 2)
-	for unixts.len < 36 {
-		unixts = '0${unixts}'
-	}
+	unixts := pad_left_with_zeroes(s.format_uint(u64(ts.unix()), 2), 36)!
 
 	sec := f64(ts.nanosecond) / 1_000_000_000
-	float_nsec := sec / (1.0 / luuid.scale_factor)
-	int_nsec := u64(float_nsec)
-	bin_nsec := s.format_uint(int_nsec, 2)
-
-	mut nsec := bin_nsec
-	for nsec.len < 38 {
-		nsec = '0${nsec}'
-	}
+	uint_nsec := u64(sec / (1.0 / luuid.scale_factor))
+	bin_nsec := s.format_uint(uint_nsec, 2)
+	nsec := pad_left_with_zeroes(bin_nsec, 38)!
 
 	ver := '0010'
 
-	mut rand := ''
-	for rand.len < 50 {
-		new_bit := r.intn(2) or { 0 }
-		rand += '${new_bit}'
-	}
+	rand := generate_random_bits(50)
 
 	nsec_1 := nsec[0..12]
 	nsec_2 := nsec[12..38]
