@@ -3,6 +3,7 @@ module luuid
 import rand
 import time
 import encoding.hex
+import sync
 
 const luuid_length = 32
 const hyphen_indexes = [8, 13, 18, 23]
@@ -13,11 +14,11 @@ const mask_4_bits = u8(0b1111)
 const mask_6_bits = u8(0b11_1111)
 const mask_8_bits = u8(0b1111_1111)
 
-// TODO mutex?
 pub struct Generator {
 mut:
 	current_ts time.Time
 	counter    u8
+	mutex      sync.Mutex
 }
 
 // new_generator is the factory function that returns a new Generator.
@@ -95,6 +96,11 @@ fn new_random_array() []u8 {
 */
 
 pub fn (mut gen Generator) v1() !string {
+	gen.mutex.@lock()
+	defer {
+		gen.mutex.unlock()
+	}
+
 	ts := time.utc()
 	gen.verify_ts(ts, 1 * time.nanosecond)
 
