@@ -24,32 +24,42 @@ mut:
 // new_generator is the factory function that returns a new Generator.
 // Always prefer utilizing the factory function.
 pub fn new_generator() &Generator {
-	return &Generator{}
+	return &Generator{
+		current_ts: time.utc()
+		counter: 0
+	}
 }
 
 // verify_ts potentially modifies generator fields, it must be invoked before using generator fields
 // during the generation process.
-fn (mut gen Generator) verify_ts(ts time.Time, duration time.Duration) {
-	// TODO if ts > gen.current_ts there was an anomaly: hang generation, then continue.
-	if ts == gen.current_ts {
-		// Rollover if counter exceeds capacity
-		if gen.counter == 255 {
-			gen.current_ts = ts.add(duration)
-			gen.counter = 0
-		} else {
-			gen.counter++
-		}
-	} else {
-		// Generating past the rollover
-		if ts < gen.current_ts && gen.current_ts == ts.add(duration) {
-			// This handles only one rollover, it is assumed the counter may be needed in bursts, not continuously.
-			// TODO if exceeded, hang until clock increment.
-			gen.counter++
-		} else {
-			gen.current_ts = ts
-			gen.counter = 0
-		}
+fn (mut gen Generator) verify_ts(ts time.Time) {
+	// detect anomaly: hang generation, then continue
+	// TODO handle large anomaly without waiting long
+	if ts < gen.current_ts {
+		// Sleep for the difference between ts and gen.current_ts
+		time.sleep(gen.current_ts - ts)
+		gen.current_ts = ts
+		gen.counter = 0
+		return
 	}
+
+	// handle generation in same nanosecond
+	if ts == gen.current_ts {
+		// prevent overflow: freeze counter and wait for timestamp to advance
+		if gen.counter == 255 {
+			// Sleep for a small duration to ensure the clock increments
+			time.sleep(1 * time.nanosecond)
+			gen.current_ts = ts.add(1 * time.nanosecond)
+			gen.counter = 0
+			return
+		}
+		gen.counter++
+		return
+	}
+
+	gen.current_ts = ts
+	gen.counter = 0
+	return
 }
 
 pub fn remove_hyphens(id string) string {
@@ -102,7 +112,7 @@ pub fn (mut gen Generator) v1() !string {
 	}
 
 	ts := time.utc()
-	gen.verify_ts(ts, 1 * time.nanosecond)
+	gen.verify_ts(ts)
 
 	mut res := new_random_array()
 
@@ -157,8 +167,7 @@ pub fn (mut gen Generator) v1() !string {
 	res[9] = u8((seq & luuid.mask_6_bits) << 2)
 
 	new_luuid_without_hyphens := hex.encode(res)
-	new_luuid_with_hyphens := add_hyphens(new_luuid_without_hyphens)!
-	return new_luuid_with_hyphens
+	return add_hyphens(new_luuid_without_hyphens)!
 }
 
 fn verify_luuid_length(id string) ! {
@@ -287,6 +296,5 @@ pub fn v2() !string {
 	res[8] = (res[8] & luuid.mask_2_bits) | u8((nsec & luuid.mask_6_bits) << 2)
 
 	new_luuid_without_hyphens := hex.encode(res)
-	new_luuid_with_hyphens := add_hyphens(new_luuid_without_hyphens)!
-	return new_luuid_with_hyphens
+	return add_hyphens(new_luuid_without_hyphens)!
 }
