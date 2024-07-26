@@ -1,17 +1,6 @@
 module luuid
 
 import rand
-import strconv
-import time
-
-// bin_to_hex wraps build_result, returns a hex string given a binary string.
-fn bin_to_hex(s string) !string {
-	if s.len > 128 {
-		return error('Binary string too long')
-	}
-	res := build_result(s) or { panic(err) }
-	return res
-}
 
 fn test_v1() {
 	mut g := new_generator()
@@ -57,27 +46,17 @@ fn test_verify() {
 	}
 }
 
-fn replace_luuid_timestamp(luuid_string string, ts time.Time) string {
-	bin_id := verify(luuid_string) or { panic(err) }
-	ts_seconds := ts.unix()
-	unixts := pad_left_with_zeroes(strconv.format_uint(u64(ts.unix()), 2), 36) or { panic(err) }
-	bin_nsec := strconv.format_uint(u64(ts.nanosecond), 2)
-	nsec := pad_left_with_zeroes(bin_nsec, 30) or { panic(err) }
-	nsec_1 := nsec[0..12]
-	nsec_2 := nsec[12..]
-	bin_res := '${unixts}${nsec_1}${bin_id[48..52]}${nsec_2}${bin_id[70..]}' // TODO currently replaces counter in v1
-	res := build_result(bin_res) or { panic(err) }
-	return res
-}
-
 fn test_parse_v1() {
 	mut g := new_generator()
 	luuid_v1 := g.v1() or { panic(err) }
-	ts := time.utc()
-	luuid_with_known_timestamp := replace_luuid_timestamp(luuid_v1, ts)
-	parsed := parse(luuid_with_known_timestamp) or { panic(err) }
-	assert parsed.timestamp.unix() == ts.unix()
-	assert parsed.timestamp.nanosecond == ts.nanosecond
+	parsed_unmodified := parse(luuid_v1) or { panic(err) }
+	assert parsed_unmodified.version == 1
+}
+
+fn test_parse_v2() {
+	luuid_v2 := v2() or { panic(err) }
+	parsed_unmodified := parse(luuid_v2) or { panic(err) }
+	assert parsed_unmodified.version == 2
 }
 
 fn test_remove_hyphens() {

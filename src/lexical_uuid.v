@@ -1,18 +1,23 @@
 module luuid
 
-import rand as r
-import strconv as s
-import time as t
+import rand
+import time
+import encoding.hex
 
 const luuid_length = 32
 const hyphen_indexes = [8, 13, 18, 23]
 const luuid_length_with_hyphens = luuid_length + hyphen_indexes.len
 
+const mask_2_bits = u8(0b11)
+const mask_4_bits = u8(0b1111)
+const mask_6_bits = u8(0b11_1111)
+const mask_8_bits = u8(0b1111_1111)
+
 // TODO mutex?
 pub struct Generator {
 mut:
-	current_ts t.Time
-	counter    int
+	current_ts time.Time
+	counter    u8
 }
 
 // new_generator is the factory function that returns a new Generator.
@@ -23,7 +28,7 @@ pub fn new_generator() &Generator {
 
 // verify_ts potentially modifies generator fields, it must be invoked before using generator fields
 // during the generation process.
-fn (mut gen Generator) verify_ts(ts t.Time, duration t.Duration) {
+fn (mut gen Generator) verify_ts(ts time.Time, duration time.Duration) {
 	// TODO if ts > gen.current_ts there was an anomaly: hang generation, then continue.
 	if ts == gen.current_ts {
 		// Rollover if counter exceeds capacity
@@ -73,36 +78,12 @@ pub fn add_hyphens(id string) !string {
 	return res
 }
 
-fn build_result(binary_string string) !string {
-	mut hex_res := ''
-	for i := 0; i < 128; i += 4 {
-		// parse character
-		character := binary_string[i..i + 4]
-		to_int := s.parse_uint(character, 2, 4) or { return error('Could not parse integer') }
-		to_hex := to_int.hex()
-		hex_res += to_hex
-	}
-	res := add_hyphens(hex_res)!
-	return res
-}
-
-fn pad_left_with_zeroes(binary_string string, desired_length int) !string {
-	if binary_string.len > desired_length {
-		return error('binary_string longer than desired.')
-	}
-
-	mut res := binary_string
-	for res.len < desired_length {
-		res = '0${res}'
-	}
-	return res
-}
-
-fn generate_random_bits(desired_length int) string {
-	mut res := ''
-	for res.len < desired_length {
-		new_bit := r.intn(2) or { 0 }
-		res += '${new_bit}'
+fn new_random_array() []u8 {
+	mut res := []u8{}
+	// fill array with random data
+	for i := 0; i < 16; i++ {
+		random_u8 := u8(rand.intn(256) or { panic(err) }) // should never panic
+		res << random_u8
 	}
 	return res
 }
@@ -114,8 +95,10 @@ fn generate_random_bits(desired_length int) string {
 */
 
 pub fn (mut gen Generator) v1() !string {
-	ts := t.utc()
-	gen.verify_ts(ts, 1 * t.nanosecond)
+	ts := time.utc()
+	gen.verify_ts(ts, 1 * time.nanosecond)
+
+	mut res := new_random_array()
 
 	/*
 	* unixts
@@ -123,24 +106,22 @@ pub fn (mut gen Generator) v1() !string {
 	*
 	* Seconds since 1st January 1970, can represent dates until the year 4147
 	*/
-	unpadded_unixts := s.format_uint(u64(gen.current_ts.unix()), 2)
-	unixts := pad_left_with_zeroes(unpadded_unixts, 36)!
+	unixts := u64(gen.current_ts.unix())
 
 	/*
 	* nsec
 	* 30 bits
 	*/
-	int_nsec := gen.current_ts.nanosecond
-	unpadded_nsec := s.format_int(int_nsec, 2)
-	nsec := pad_left_with_zeroes(unpadded_nsec, 30)!
+	nsec := u32(gen.current_ts.nanosecond)
 
 	/*
 	* ver
+	* 4 bits
 	*
 	* Version is set to 1 because it is the first implementation of the Lexical UUID.
 	* 0     0     0     1
 	*/
-	ver := '0001'
+	ver := u8(0b0001)
 
 	/*
 	* seq
@@ -155,24 +136,23 @@ pub fn (mut gen Generator) v1() !string {
 	*
 	* Counter increment and rollover is handled by `gen.verify_ts`.
 	*/
-	unpadded_seq := s.format_int(gen.counter, 2)
-	seq := pad_left_with_zeroes(unpadded_seq, 8)!
+	seq := gen.counter
 
-	/*
-	* rand
-	* 42 bits
-	*/
-	rand := generate_random_bits(50)
+	// insert the data in the array
+	res[0] = u8(unixts >> 28)
+	res[1] = u8((unixts >> 20) & luuid.mask_8_bits)
+	res[2] = u8((unixts >> 12) & luuid.mask_8_bits)
+	res[3] = u8((unixts >> 4) & luuid.mask_8_bits)
+	res[4] = u8(((unixts & luuid.mask_4_bits) << 4) | ((nsec >> 26) & luuid.mask_4_bits))
+	res[5] = u8((nsec >> 18) & luuid.mask_8_bits)
+	res[6] = u8(((nsec >> 14) & luuid.mask_4_bits) | (ver << 4))
+	res[7] = u8((nsec >> 6) & luuid.mask_8_bits)
+	res[8] = u8(((nsec & luuid.mask_6_bits) << 2) | (seq >> 6))
+	res[9] = u8((seq & luuid.mask_6_bits) << 2)
 
-	/*
-	* result
-	*/
-	nsec_1 := nsec[0..12]
-	nsec_2 := nsec[12..]
-
-	bin_res := '${unixts}${nsec_1}${ver}${nsec_2}${seq}${rand}'
-
-	return build_result(bin_res)!
+	new_luuid_without_hyphens := hex.encode(res)
+	new_luuid_with_hyphens := add_hyphens(new_luuid_without_hyphens)!
+	return new_luuid_with_hyphens
 }
 
 fn verify_luuid_length(id string) ! {
@@ -199,50 +179,53 @@ fn verify_hypens_position(id string) ! {
 // Returns the binary representation of the string for further parsing.
 // Returns an error if the string does not match the expected format.
 // This function is useful to verify whether a string is a seemingly-valid UUID.
-fn verify(id string) !string {
+fn verify(id string) ![]u8 {
 	verify_luuid_length(id)!
 	if id.len == luuid.luuid_length_with_hyphens {
 		verify_hypens_amount(id)!
 		verify_hypens_position(id)!
 		luuid_without_hyphens := id.replace('-', '')
-		return hex_to_bin(luuid_without_hyphens)
+		return hex.decode(luuid_without_hyphens)!
 	}
 
 	verify_lacks_hyphens(id)!
-	return hex_to_bin(id)
-}
-
-// hex_to_bin returns a binary string from the given hex string.
-fn hex_to_bin(id string) !string {
-	mut bin := ''
-	chars := id.split('')
-	for c in chars {
-		parsed_hex := c.parse_int(16, 64)!
-		mut res := s.format_int(parsed_hex, 2)
-		// pad left
-		for res.len < 4 {
-			res = '0${res}'
-		}
-		bin += res
-	}
-	return bin
+	return hex.decode(id)!
 }
 
 struct Luuid {
-	timestamp t.Time
+	timestamp time.Time
 	version   int
 }
 
-fn extract_timestamp(binary_id string) !t.Time {
-	bin_seconds := binary_id[..36]
-	seconds := s.parse_int(bin_seconds, 2, 64)!
+fn extract_seconds(binary_id []u8) i64 {
+	mut res := u64(0)
+	for i := 0; i < 5; i++ {
+		res = (res << 8) | binary_id[i]
+	}
+	// discard the least significant 4 bits, as they are part of the nanosecond bits
+	res = res >> 4
+	cast_res := i64(res)
+	return cast_res
+}
 
-	nsec_1 := binary_id[36..48]
-	nsec_2 := binary_id[52..70]
-	bin_nsec := '${nsec_1}${nsec_2}'
-	nsec := s.parse_int(bin_nsec, 2, 32)!
+fn extract_nanoseconds(binary_id []u8) int {
+	mut res := u32(0)
+	res = binary_id[4] & luuid.mask_4_bits
 
-	ts := t.unix_nanosecond(seconds, int(nsec))
+	for i := 5; i < 8; i++ {
+		res = (res << 8) | binary_id[i]
+	}
+
+	res = (res << 2) | ((binary_id[8] >> 6) & luuid.mask_2_bits)
+
+	cast_res := int(res)
+	return cast_res
+}
+
+fn extract_timestamp(binary_id []u8) !time.Time {
+	seconds := extract_seconds(binary_id)
+	nanoseconds := extract_nanoseconds(binary_id)
+	ts := time.unix_nanosecond(seconds, nanoseconds)
 	return ts
 }
 
@@ -250,20 +233,20 @@ pub fn parse(id string) !Luuid {
 	parse_error_message := 'The ID is not a Luuid'
 	bin := verify(id)!
 
-	version := bin[48..52]
-	if version == '0001' {
+	version := (bin[6] >> 4) & luuid.mask_4_bits
+	if version == 1 {
 		ts := extract_timestamp(bin) or { return error(parse_error_message) }
 		return Luuid{
 			timestamp: ts
-			version: 1
+			version: version
 		}
 	}
 
-	if version == '0010' {
+	if version == 2 {
 		ts := extract_timestamp(bin) or { return error(parse_error_message) }
 		return Luuid{
 			timestamp: ts
-			version: 2
+			version: version
 		}
 	}
 
@@ -278,21 +261,26 @@ pub fn parse(id string) !Luuid {
 
 // v2 does not use a generator and does not contain monotonic counter bits.
 pub fn v2() !string {
-	ts := t.utc()
-	unixts := pad_left_with_zeroes(s.format_uint(u64(ts.unix()), 2), 36)!
+	mut res := new_random_array()
 
-	int_nsec := ts.nanosecond
-	unpadded_nsec := s.format_int(int_nsec, 2)
-	nsec := pad_left_with_zeroes(unpadded_nsec, 30)!
+	ts := time.utc()
 
-	ver := '0010'
+	unixts := u64(ts.unix())
+	nsec := u32(ts.nanosecond)
+	ver := u8(0b0010)
 
-	rand := generate_random_bits(58)
+	// unixts 36 bits, nsec 12 bits, ver 4 bits, nsec 18 bits
+	res[0] = u8(unixts >> 28)
+	res[1] = u8((unixts >> 20) & luuid.mask_8_bits)
+	res[2] = u8((unixts >> 12) & luuid.mask_8_bits)
+	res[3] = u8((unixts >> 4) & luuid.mask_8_bits)
+	res[4] = u8(((unixts & luuid.mask_4_bits) << 4) | ((nsec >> 26) & luuid.mask_4_bits))
+	res[5] = u8((nsec >> 18) & luuid.mask_8_bits)
+	res[6] = u8(((nsec >> 14) & luuid.mask_4_bits) | (ver << 4))
+	res[7] = u8((nsec >> 6) & luuid.mask_8_bits)
+	res[8] = (res[8] & luuid.mask_2_bits) | u8((nsec & luuid.mask_6_bits) << 2)
 
-	nsec_1 := nsec[0..12]
-	nsec_2 := nsec[12..]
-
-	bin_res := '${unixts}${nsec_1}${ver}${nsec_2}${rand}'
-
-	return build_result(bin_res)!
+	new_luuid_without_hyphens := hex.encode(res)
+	new_luuid_with_hyphens := add_hyphens(new_luuid_without_hyphens)!
+	return new_luuid_with_hyphens
 }
