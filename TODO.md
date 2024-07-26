@@ -1,4 +1,3 @@
 # TODO
 
-- Verify newly generated timestamp is larger than the previous.
-- Refactor: avoid string operations for more efficient generation.
+- Prevent large anomalies from hanging the program for too long.
