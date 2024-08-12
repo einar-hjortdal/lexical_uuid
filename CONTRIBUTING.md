@@ -7,12 +7,10 @@ Please follow these standards
 1. Fork the project and clone your fork to your development environment
 2. Add the original repository as an additional git remote called "upstream"
 3. Create a new branch
-  - The branch called production is the branch that goes live
-  - The branch called master is the branch used for development
-  - Feature (feat_) branches are branched off and then merged into master once features are bug-free
-  - Release (rele_) branches are branched off master and then merged into production
-  - Bug fix (bugf_) branches are branched off production and then merged into both production, release 
-  and master
+  - The branch called `live` is the branch that goes live.
+  - The branch called `pending` is the branch used for changes that are pending to go live.
+  - New features are branched from `live` and merged into `pending` when ready.
+  - Bug fixes are branched from `live` and then merged into both `live` and `pending`.
 
 4. Write your code, test it and make sure it works
 5. Commit your changes

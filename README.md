@@ -53,4 +53,6 @@ The lack of monotonic clock sequence allows generation without a generator.
 ## Utility functions
 
 This module also exports some utility functions for working with LUUID.
-- add_hyphens
+- `add_hyphens`
+- `remove_hyphens`
+- `parse`
