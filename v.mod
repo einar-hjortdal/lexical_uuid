@@ -1,7 +1,7 @@
 Module{
 	name: 'luuid'
 	description: 'lexicographically-sortable universally unique id.'
-	repo_url: 'https://github.com/Coachonko/lexical_uuid'
+	repo_url: 'https://github.com/einar-hjortdal/lexical_uuid'
 	version: '3.9.0'
 	license: 'NCSA'
 	dependencies: []
