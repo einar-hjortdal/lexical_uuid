@@ -26,7 +26,7 @@ mut:
 pub fn new_generator() &Generator {
 	return &Generator{
 		current_ts: time.utc()
-		counter: 0
+		counter:    0
 	}
 }
 
@@ -74,16 +74,16 @@ fn verify_lacks_hyphens(id string) ! {
 
 // add_hyphens adds hyphens to a LUUID without hyphens.
 pub fn add_hyphens(id string) !string {
-	if id.len != luuid.luuid_length {
+	if id.len != luuid_length {
 		return error('ID too long or too short')
 	}
 	verify_lacks_hyphens(id)!
 
 	mut res := id
 
-	len := luuid.hyphen_indexes.len
+	len := hyphen_indexes.len
 	for i := 0; i < len; i++ {
-		hyphen_index := luuid.hyphen_indexes[i]
+		hyphen_index := hyphen_indexes[i]
 		res = res[..hyphen_index] + '-' + res[hyphen_index..]
 	}
 	return res
@@ -105,7 +105,7 @@ fn new_random_array() []u8 {
 *
 */
 
-pub fn (mut gen Generator) v1() !string {
+pub fn (mut gen Generator) v1() string {
 	gen.mutex.@lock()
 	defer {
 		gen.mutex.unlock()
@@ -156,22 +156,23 @@ pub fn (mut gen Generator) v1() !string {
 
 	// insert the data in the array
 	res[0] = u8(unixts >> 28)
-	res[1] = u8((unixts >> 20) & luuid.mask_8_bits)
-	res[2] = u8((unixts >> 12) & luuid.mask_8_bits)
-	res[3] = u8((unixts >> 4) & luuid.mask_8_bits)
-	res[4] = u8(((unixts & luuid.mask_4_bits) << 4) | ((nsec >> 26) & luuid.mask_4_bits))
-	res[5] = u8((nsec >> 18) & luuid.mask_8_bits)
-	res[6] = u8(((nsec >> 14) & luuid.mask_4_bits) | (ver << 4))
-	res[7] = u8((nsec >> 6) & luuid.mask_8_bits)
-	res[8] = u8(((nsec & luuid.mask_6_bits) << 2) | (seq >> 6))
-	res[9] = u8((seq & luuid.mask_6_bits) << 2)
+	res[1] = u8((unixts >> 20) & mask_8_bits)
+	res[2] = u8((unixts >> 12) & mask_8_bits)
+	res[3] = u8((unixts >> 4) & mask_8_bits)
+	res[4] = u8(((unixts & mask_4_bits) << 4) | ((nsec >> 26) & mask_4_bits))
+	res[5] = u8((nsec >> 18) & mask_8_bits)
+	res[6] = u8(((nsec >> 14) & mask_4_bits) | (ver << 4))
+	res[7] = u8((nsec >> 6) & mask_8_bits)
+	res[8] = u8(((nsec & mask_6_bits) << 2) | (seq >> 6))
+	res[9] = u8((seq & mask_6_bits) << 2)
 
 	new_luuid_without_hyphens := hex.encode(res)
-	return add_hyphens(new_luuid_without_hyphens)!
+	new_luuid_with_hyphens := add_hyphens(new_luuid_without_hyphens) or { panic(err) } // should never panic
+	return new_luuid_with_hyphens
 }
 
 fn verify_luuid_length(id string) ! {
-	if id.len != luuid.luuid_length && id.len != luuid.luuid_length_with_hyphens {
+	if id.len != luuid_length && id.len != luuid_length_with_hyphens {
 		return error('The provided ID is too long or too short')
 	}
 }
@@ -183,7 +184,7 @@ fn verify_hypens_amount(id string) ! {
 }
 
 fn verify_hypens_position(id string) ! {
-	for idx in luuid.hyphen_indexes {
+	for idx in hyphen_indexes {
 		if id[idx] != 45 { // ascii 45 is a hyphen
 			return error('Hyphen missing or in wrong position')
 		}
@@ -196,7 +197,7 @@ fn verify_hypens_position(id string) ! {
 // This function is useful to verify whether a string is a seemingly-valid UUID.
 fn verify(id string) ![]u8 {
 	verify_luuid_length(id)!
-	if id.len == luuid.luuid_length_with_hyphens {
+	if id.len == luuid_length_with_hyphens {
 		verify_hypens_amount(id)!
 		verify_hypens_position(id)!
 		luuid_without_hyphens := id.replace('-', '')
@@ -225,13 +226,13 @@ fn extract_seconds(binary_id []u8) i64 {
 
 fn extract_nanoseconds(binary_id []u8) int {
 	mut res := u32(0)
-	res = binary_id[4] & luuid.mask_4_bits
+	res = binary_id[4] & mask_4_bits
 
 	for i := 5; i < 8; i++ {
 		res = (res << 8) | binary_id[i]
 	}
 
-	res = (res << 2) | ((binary_id[8] >> 6) & luuid.mask_2_bits)
+	res = (res << 2) | ((binary_id[8] >> 6) & mask_2_bits)
 
 	cast_res := int(res)
 	return cast_res
@@ -248,12 +249,12 @@ pub fn parse(id string) !Luuid {
 	parse_error_message := 'The ID is not a Luuid'
 	bin := verify(id)!
 
-	version := (bin[6] >> 4) & luuid.mask_4_bits
+	version := (bin[6] >> 4) & mask_4_bits
 	if version == 1 {
 		ts := extract_timestamp(bin) or { return error(parse_error_message) }
 		return Luuid{
 			timestamp: ts
-			version: version
+			version:   version
 		}
 	}
 
@@ -261,7 +262,7 @@ pub fn parse(id string) !Luuid {
 		ts := extract_timestamp(bin) or { return error(parse_error_message) }
 		return Luuid{
 			timestamp: ts
-			version: version
+			version:   version
 		}
 	}
 
@@ -275,7 +276,7 @@ pub fn parse(id string) !Luuid {
 */
 
 // v2 does not use a generator and does not contain monotonic counter bits.
-pub fn v2() !string {
+pub fn v2() string {
 	mut res := new_random_array()
 
 	ts := time.utc()
@@ -286,15 +287,16 @@ pub fn v2() !string {
 
 	// unixts 36 bits, nsec 12 bits, ver 4 bits, nsec 18 bits
 	res[0] = u8(unixts >> 28)
-	res[1] = u8((unixts >> 20) & luuid.mask_8_bits)
-	res[2] = u8((unixts >> 12) & luuid.mask_8_bits)
-	res[3] = u8((unixts >> 4) & luuid.mask_8_bits)
-	res[4] = u8(((unixts & luuid.mask_4_bits) << 4) | ((nsec >> 26) & luuid.mask_4_bits))
-	res[5] = u8((nsec >> 18) & luuid.mask_8_bits)
-	res[6] = u8(((nsec >> 14) & luuid.mask_4_bits) | (ver << 4))
-	res[7] = u8((nsec >> 6) & luuid.mask_8_bits)
-	res[8] = (res[8] & luuid.mask_2_bits) | u8((nsec & luuid.mask_6_bits) << 2)
+	res[1] = u8((unixts >> 20) & mask_8_bits)
+	res[2] = u8((unixts >> 12) & mask_8_bits)
+	res[3] = u8((unixts >> 4) & mask_8_bits)
+	res[4] = u8(((unixts & mask_4_bits) << 4) | ((nsec >> 26) & mask_4_bits))
+	res[5] = u8((nsec >> 18) & mask_8_bits)
+	res[6] = u8(((nsec >> 14) & mask_4_bits) | (ver << 4))
+	res[7] = u8((nsec >> 6) & mask_8_bits)
+	res[8] = (res[8] & mask_2_bits) | u8((nsec & mask_6_bits) << 2)
 
 	new_luuid_without_hyphens := hex.encode(res)
-	return add_hyphens(new_luuid_without_hyphens)!
+	new_luuid_with_hyphens := add_hyphens(new_luuid_without_hyphens) or { panic(err) } // should never panic
+	return new_luuid_with_hyphens
 }
