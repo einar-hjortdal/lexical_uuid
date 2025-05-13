@@ -56,3 +56,5 @@ This module also exports some utility functions for working with LUUID.
 - `add_hyphens`
 - `remove_hyphens`
 - `parse`
+- `to_bytes`
+- `from_bytes`
