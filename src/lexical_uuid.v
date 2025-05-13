@@ -89,6 +89,11 @@ pub fn add_hyphens(id string) !string {
 	return res
 }
 
+// the opposite of to_bytes
+pub fn from_bytes(b []u8) !string {
+	return add_hyphens(hex.encode(b))!
+}
+
 fn new_random_array() []u8 {
 	mut res := []u8{}
 	// fill array with random data
@@ -191,11 +196,12 @@ fn verify_hypens_position(id string) ! {
 	}
 }
 
-// verify accepts LUUID with or without hyphens.
+// to_bytes accepts LUUID with or without hyphens.
 // Returns the binary representation of the string for further parsing.
 // Returns an error if the string does not match the expected format.
 // This function is useful to verify whether a string is a seemingly-valid UUID.
-fn verify(id string) ![]u8 {
+// It is also handy to convert a LUUID so that it can be inserted into Firebird SQL BINARY columns.
+pub fn to_bytes(id string) ![]u8 {
 	verify_luuid_length(id)!
 	if id.len == luuid_length_with_hyphens {
 		verify_hypens_amount(id)!
@@ -247,7 +253,7 @@ fn extract_timestamp(binary_id []u8) !time.Time {
 
 pub fn parse(id string) !Luuid {
 	parse_error_message := 'The ID is not a Luuid'
-	bin := verify(id)!
+	bin := to_bytes(id)!
 
 	version := (bin[6] >> 4) & mask_4_bits
 	if version == 1 {
