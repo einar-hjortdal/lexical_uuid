@@ -5,6 +5,7 @@ import time
 import encoding.hex
 import sync
 
+const random_array_length = 16
 const luuid_length = 32
 const hyphen_indexes = [8, 13, 18, 23]
 const luuid_length_with_hyphens = luuid_length + hyphen_indexes.len
@@ -94,12 +95,11 @@ pub fn from_bytes(b []u8) !string {
 	return add_hyphens(hex.encode(b))!
 }
 
+// return array filled with random data
 fn new_random_array() []u8 {
-	mut res := []u8{}
-	// fill array with random data
-	for i := 0; i < 16; i++ {
-		random_u8 := u8(rand.intn(256) or { panic(err) }) // should never panic
-		res << random_u8
+	mut res := []u8{len: random_array_length}
+	for i := 0; i < random_array_length; i++ {
+		res[i] = u8(rand.intn(256) or { panic(err) }) // should never panic
 	}
 	return res
 }
