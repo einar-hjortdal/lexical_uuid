@@ -58,3 +58,16 @@ This module also exports some utility functions for working with LUUID.
 - `parse`
 - `to_bytes`
 - `from_bytes`
+
+## Database use
+
+In FirebirdSQL, LUUID can be stored just like any UUID, using the type `BINARY(16)`.
+
+FirebirdSQL provides functions to transform UUID from `BINARY(16)` TO `CHAR(36)` (`UUID_TO_CHAR()`) 
+and the other way around (`CHAR_TO_UUID()`). These functions work correctly with LUUID.
+
+This library provides the utility functions `to_bytes` and `from_bytes`.
+- `to_bytes` transforms a luuid `string` into a `[]u8`
+- `from_bytes` transforms a luuid `[]u8` to a `string`
+With these you can bind and retrieve `[]u8` to and from `BINARY(16)` columns. No more `SELECT UUID_TO_CHAR(...)` 
+and `INSERT CHAR_TO_UUID(...)` in your queries.
