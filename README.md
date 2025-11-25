@@ -71,3 +71,7 @@ This library provides the utility functions `to_bytes` and `from_bytes`.
 - `from_bytes` transforms a luuid `[]u8` to a `string`
 With these you can bind and retrieve `[]u8` to and from `BINARY(16)` columns. No more `SELECT UUID_TO_CHAR(...)` 
 and `INSERT CHAR_TO_UUID(...)` in your queries.
+
+## Lore
+
+Originally an implementation [this proposed UUIDv7 design](https://www.ietf.org/archive/id/draft-peabody-dispatch-new-uuid-format-01.html#name-uuidv7-field-and-bit-layout-en). Subsequently, this design was scrapped, and the final UUIDv7 design was implemented in [vlib](https://modules.vlang.io/rand.html#uuid_v7). This change prompted me to deviate from the original structure to gain 10 bits of uniqueness guarantees. I achieved this by removing the 2 variant bits and the 8 fractional nanosecond bits [as discussed here](https://github.com/uuid6/uuid6-ietf-draft/issues/24) bits, This modification still maintains full UUID compatibility with FirebirdSQL's `UUID_TO_CHAR()` and `CHAR_TO_UUID()` functions.
