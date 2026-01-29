@@ -1,7 +1,5 @@
 module luuid
 
-import rand
-
 fn test_v1() {
 	mut g := new_generator()
 	res := g.v1()
@@ -31,4 +29,12 @@ fn test_remove_hyphens() {
 	luuid_without_hyphens := '${luuid_v2[..8]}${luuid_v2[9..13]}${luuid_v2[14..18]}${luuid_v2[19..23]}${luuid_v2[24..]}'
 	res := remove_hyphens(luuid_v2)
 	assert res == luuid_without_hyphens
+}
+
+fn test_to_bytes() {
+	mut g := new_generator()
+	v_1 := g.v1()
+	v_2 := v2()
+	v_1_bytes := to_bytes(v_1)!
+	v_2_bytes := to_bytes(v_2)!
 }

@@ -214,7 +214,8 @@ pub fn to_bytes(id string) ![]u8 {
 	return hex.decode(id)!
 }
 
-struct Luuid {
+pub struct Luuid {
+pub:
 	timestamp time.Time
 	version   int
 }
